@@ -252,8 +252,8 @@ public class RevenueService : IRevenueService
         var contractRevenue = await _context.Payments
             .Include(p => p.Contract)
             .Where(p => !p.IsRefunded && 
-                       p.Contract.IsSigned &&
-                       (softwareId == null || p.Contract.SoftwareId == softwareId))
+                        p.Contract.IsSigned &&
+                        (softwareId == null || p.Contract.SoftwareId == softwareId))
             .SumAsync(p => p.Amount);
         
         if (!string.IsNullOrEmpty(currency) && currency.ToUpper() != "PLN")
@@ -270,15 +270,15 @@ public class RevenueService : IRevenueService
         
         var unsignedContracts = await _context.Contracts
             .Where(c => !c.IsSigned && !c.IsCancelled &&
-                       (softwareId == null || c.SoftwareId == softwareId))
+                        (softwareId == null || c.SoftwareId == softwareId))
             .SumAsync(c => c.Price);
-
-        var totalPredicted = currentRevenue + unsignedContracts;
         
         if (!string.IsNullOrEmpty(currency) && currency.ToUpper() != "PLN")
         {
-            totalPredicted = await ConvertCurrency(totalPredicted, currency);
+            unsignedContracts = await ConvertCurrency(unsignedContracts, currency);
         }
+
+        var totalPredicted = currentRevenue + unsignedContracts;
 
         return totalPredicted;
     }
@@ -317,25 +317,27 @@ public class RevenueService : IRevenueService
 
     public async Task<decimal> ConvertCurrency(decimal amount, string targetCurrency)
     {
-        try
+        var currency = targetCurrency.ToUpper();
+        
+        if (currency == "PLN")
         {
-            var response = await _httpClient.GetStringAsync($"https://api.exchangerate-api.com/v4/latest/PLN");
-            var exchangeData = JsonSerializer.Deserialize<ExchangeRateResponse>(response);
-            
-            if (exchangeData?.Rates?.ContainsKey(targetCurrency.ToUpper()) == true)
+            return amount;
+        }
+
+        var response = await _httpClient.GetStringAsync("https://api.exchangerate-api.com/v4/latest/PLN");
+        
+        using var doc = JsonDocument.Parse(response);
+        var root = doc.RootElement;
+        
+        if (root.TryGetProperty("rates", out var ratesElement))
+        {
+            if (ratesElement.TryGetProperty(currency, out var rateElement))
             {
-                return amount * exchangeData.Rates[targetCurrency.ToUpper()];
+                var rate = rateElement.GetDecimal();
+                return amount * rate;
             }
         }
-        catch
-        {
-        }
-
+        
         return amount;
     }
-}
-
-public class ExchangeRateResponse
-{
-    public Dictionary<string, decimal>? Rates { get; set; }
 }
