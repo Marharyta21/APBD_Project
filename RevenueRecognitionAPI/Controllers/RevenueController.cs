@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RevenueRecognitionAPI.Attributes;
 using RevenueRecognitionAPI.DTOs;
 using RevenueRecognitionAPI.Services;
 
@@ -7,6 +8,7 @@ namespace RevenueRecognitionAPI.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[RequireAdmin]
 public class RevenueController : ControllerBase
 {
     private readonly IRevenueService _revenueService;

@@ -31,11 +31,22 @@ public class RequireRoleAttribute : Attribute, IAuthorizationFilter
             context.Result = new ForbidResult();
             return;
         }
-        
-        if (_requiredRole == EmployeeRole.Admin && userRole != EmployeeRole.Admin)
+  
+        if (_requiredRole == EmployeeRole.Admin)
         {
-            context.Result = new ForbidResult();
-            return;
+            if (userRole != EmployeeRole.Admin)
+            {
+                context.Result = new ForbidResult();
+                return;
+            }
+        }
+        else if (_requiredRole == EmployeeRole.StandardUser)
+        {
+            if (userRole != EmployeeRole.StandardUser && userRole != EmployeeRole.Admin)
+            {
+                context.Result = new ForbidResult();
+                return;
+            }
         }
     }
 }

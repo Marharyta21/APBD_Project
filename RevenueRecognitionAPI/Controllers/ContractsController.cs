@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RevenueRecognitionAPI.Attributes;
 using RevenueRecognitionAPI.DTOs;
 using RevenueRecognitionAPI.Models;
 using RevenueRecognitionAPI.Services;
@@ -8,6 +9,7 @@ namespace RevenueRecognitionAPI.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[RequireUser]
 public class ContractsController : ControllerBase
 {
     private readonly IRevenueService _revenueService;
@@ -108,6 +110,7 @@ public class ContractsController : ControllerBase
     }
 
     [HttpPost("cancel-expired")]
+    [RequireAdmin]
     public async Task<IActionResult> CancelExpiredContracts()
     {
         await _revenueService.CancelExpiredContracts();
