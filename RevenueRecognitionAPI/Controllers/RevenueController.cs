@@ -8,7 +8,7 @@ namespace RevenueRecognitionAPI.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-[RequireAdmin]
+[RequireUser]
 public class RevenueController : ControllerBase
 {
     private readonly IRevenueService _revenueService;

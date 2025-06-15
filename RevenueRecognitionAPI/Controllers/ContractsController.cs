@@ -110,7 +110,6 @@ public class ContractsController : ControllerBase
     }
 
     [HttpPost("cancel-expired")]
-    [RequireAdmin]
     public async Task<IActionResult> CancelExpiredContracts()
     {
         await _revenueService.CancelExpiredContracts();
