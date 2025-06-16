@@ -110,26 +110,11 @@ public class ContractsController : ControllerBase
     }
 
     [HttpPost("cancel-expired")]
+    [RequireAdmin]
     public async Task<IActionResult> CancelExpiredContracts()
     {
-        var cancelledCount = await _revenueService.CancelExpiredContracts();
-    
-        if (cancelledCount == 0)
-        {
-            return Ok(new 
-            { 
-                Message = "No expired contracts found to cancel",
-                CancelledContracts = 0,
-                Timestamp = DateTime.UtcNow
-            });
-        }
-    
-        return Ok(new 
-        { 
-            Message = $"Successfully cancelled {cancelledCount} expired contract(s) and refunded payments",
-            CancelledContracts = cancelledCount,
-            Timestamp = DateTime.UtcNow
-        });
+        await _revenueService.CancelExpiredContracts();
+        return Ok(new { Message = "Expired contracts have been cancelled and payments refunded" });
     }
 
     private async Task<ContractResponseDTO> MapContractToResponse(Contract contract)

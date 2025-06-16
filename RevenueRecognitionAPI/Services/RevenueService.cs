@@ -56,96 +56,54 @@ public class RevenueService : IRevenueService
 
     public async Task<IndividualClient?> UpdateIndividualClient(int clientId, IndividualClient updatedClient)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
-        {
-            var existingClient = await _context.IndividualClients
-                .FirstOrDefaultAsync(c => c.Id == clientId && !c.IsDeleted);
+        var existingClient = await _context.IndividualClients
+            .FirstOrDefaultAsync(c => c.Id == clientId && !c.IsDeleted);
 
-            if (existingClient == null) 
-            {
-                await transaction.RollbackAsync();
-                return null;
-            }
-            
-            existingClient.FirstName = updatedClient.FirstName;
-            existingClient.LastName = updatedClient.LastName;
-            existingClient.Address = updatedClient.Address;
-            existingClient.Email = updatedClient.Email;
-            existingClient.PhoneNumber = updatedClient.PhoneNumber;
+        if (existingClient == null) return null;
+        
+        existingClient.FirstName = updatedClient.FirstName;
+        existingClient.LastName = updatedClient.LastName;
+        existingClient.Address = updatedClient.Address;
+        existingClient.Email = updatedClient.Email;
+        existingClient.PhoneNumber = updatedClient.PhoneNumber;
 
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-            return existingClient;
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            return null;
-        }
+        await _context.SaveChangesAsync();
+        return existingClient;
     }
 
     public async Task<CompanyClient?> UpdateCompanyClient(int clientId, CompanyClient updatedClient)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
-        {
-            var existingClient = await _context.CompanyClients
-                .FirstOrDefaultAsync(c => c.Id == clientId && !c.IsDeleted);
+        var existingClient = await _context.CompanyClients
+            .FirstOrDefaultAsync(c => c.Id == clientId && !c.IsDeleted);
 
-            if (existingClient == null) 
-            {
-                await transaction.RollbackAsync();
-                return null;
-            }
+        if (existingClient == null) return null;
         
-            existingClient.CompanyName = updatedClient.CompanyName;
-            existingClient.Address = updatedClient.Address;
-            existingClient.Email = updatedClient.Email;
-            existingClient.PhoneNumber = updatedClient.PhoneNumber;
+        existingClient.CompanyName = updatedClient.CompanyName;
+        existingClient.Address = updatedClient.Address;
+        existingClient.Email = updatedClient.Email;
+        existingClient.PhoneNumber = updatedClient.PhoneNumber;
 
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-            return existingClient;
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            return null;
-        }
+        await _context.SaveChangesAsync();
+        return existingClient;
     }
 
     public async Task<bool> SoftDeleteIndividualClient(int clientId)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
-        {
-            var client = await _context.IndividualClients
-                .FirstOrDefaultAsync(c => c.Id == clientId && !c.IsDeleted);
+        var client = await _context.IndividualClients
+            .FirstOrDefaultAsync(c => c.Id == clientId && !c.IsDeleted);
 
-            if (client == null) 
-            {
-                await transaction.RollbackAsync();
-                return false;
-            }
-            
-            client.IsDeleted = true;
-            client.FirstName = "DELETED";
-            client.LastName = "DELETED";
-            client.Email = "deleted@deleted.com";
-            client.PhoneNumber = "000000000";
-            client.Address = "DELETED";
-            client.PESEL = "00000000000";
+        if (client == null) return false;
+        
+        client.IsDeleted = true;
+        client.FirstName = "DELETED";
+        client.LastName = "DELETED";
+        client.Email = "deleted@deleted.com";
+        client.PhoneNumber = "000000000";
+        client.Address = "DELETED";
+        client.PESEL = "00000000000";
 
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-            return true;
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            return false;
-        }
+        await _context.SaveChangesAsync();
+        return true;
     }
 
     public async Task<IEnumerable<Client>> GetAllClients()
@@ -210,75 +168,50 @@ public class RevenueService : IRevenueService
 
     public async Task<bool> ProcessContractPayment(int contractId, decimal amount)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
-        {
-            var contract = await GetContractById(contractId);
-            if (contract == null || !contract.IsPaymentWindowOpen || contract.IsFullyPaid)
-            {
-                await transaction.RollbackAsync();
-                return false;
-            }
-
-            var payment = new Payment
-            {
-                ContractId = contractId,
-                Amount = amount,
-                PaymentDate = DateTime.UtcNow
-            };
-
-            _context.Payments.Add(payment);
-        
-            if (contract.TotalPaid + amount >= contract.Price)
-            {
-                contract.IsSigned = true;
-            }
-
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-            return true;
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
+        var contract = await GetContractById(contractId);
+        if (contract == null || !contract.IsPaymentWindowOpen || contract.IsFullyPaid)
             return false;
-        }
-    }
-    
-    public async Task<int> CancelExpiredContracts()
-    {
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
+
+        var payment = new Payment
         {
-            var expiredContracts = await _context.Contracts
-                .Where(c => !c.IsSigned && !c.IsCancelled && DateTime.UtcNow > c.EndDate)
+            ContractId = contractId,
+            Amount = amount,
+            PaymentDate = DateTime.UtcNow
+        };
+
+        _context.Payments.Add(payment);
+        
+        if (contract.TotalPaid + amount >= contract.Price)
+        {
+            contract.IsSigned = true;
+        }
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task CancelExpiredContracts()
+    {
+        var expiredContracts = await _context.Contracts
+            .Where(c => !c.IsSigned && !c.IsCancelled && DateTime.UtcNow > c.EndDate)
+            .ToListAsync();
+
+        foreach (var contract in expiredContracts)
+        {
+            contract.IsCancelled = true;
+            
+            var payments = await _context.Payments
+                .Where(p => p.ContractId == contract.Id && !p.IsRefunded)
                 .ToListAsync();
 
-            foreach (var contract in expiredContracts)
+            foreach (var payment in payments)
             {
-                contract.IsCancelled = true;
-            
-                var payments = await _context.Payments
-                    .Where(p => p.ContractId == contract.Id && !p.IsRefunded)
-                    .ToListAsync();
-
-                foreach (var payment in payments)
-                {
-                    payment.IsRefunded = true;
-                    payment.RefundDate = DateTime.UtcNow;
-                }
+                payment.IsRefunded = true;
+                payment.RefundDate = DateTime.UtcNow;
             }
+        }
 
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-        
-            return expiredContracts.Count;
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
+        await _context.SaveChangesAsync();
     }
     
     // DISCOUNT SYSTEM
@@ -319,8 +252,8 @@ public class RevenueService : IRevenueService
         var contractRevenue = await _context.Payments
             .Include(p => p.Contract)
             .Where(p => !p.IsRefunded && 
-                        p.Contract.IsSigned &&
-                        (softwareId == null || p.Contract.SoftwareId == softwareId))
+                       p.Contract.IsSigned &&
+                       (softwareId == null || p.Contract.SoftwareId == softwareId))
             .SumAsync(p => p.Amount);
         
         if (!string.IsNullOrEmpty(currency) && currency.ToUpper() != "PLN")
@@ -337,15 +270,15 @@ public class RevenueService : IRevenueService
         
         var unsignedContracts = await _context.Contracts
             .Where(c => !c.IsSigned && !c.IsCancelled &&
-                        (softwareId == null || c.SoftwareId == softwareId))
+                       (softwareId == null || c.SoftwareId == softwareId))
             .SumAsync(c => c.Price);
+
+        var totalPredicted = currentRevenue + unsignedContracts;
         
         if (!string.IsNullOrEmpty(currency) && currency.ToUpper() != "PLN")
         {
-            unsignedContracts = await ConvertCurrency(unsignedContracts, currency);
+            totalPredicted = await ConvertCurrency(totalPredicted, currency);
         }
-
-        var totalPredicted = currentRevenue + unsignedContracts;
 
         return totalPredicted;
     }
@@ -384,27 +317,25 @@ public class RevenueService : IRevenueService
 
     public async Task<decimal> ConvertCurrency(decimal amount, string targetCurrency)
     {
-        var currency = targetCurrency.ToUpper();
-        
-        if (currency == "PLN")
+        try
         {
-            return amount;
-        }
-
-        var response = await _httpClient.GetStringAsync("https://api.exchangerate-api.com/v4/latest/PLN");
-        
-        using var doc = JsonDocument.Parse(response);
-        var root = doc.RootElement;
-        
-        if (root.TryGetProperty("rates", out var ratesElement))
-        {
-            if (ratesElement.TryGetProperty(currency, out var rateElement))
+            var response = await _httpClient.GetStringAsync($"https://api.exchangerate-api.com/v4/latest/PLN");
+            var exchangeData = JsonSerializer.Deserialize<ExchangeRateResponse>(response);
+            
+            if (exchangeData?.Rates?.ContainsKey(targetCurrency.ToUpper()) == true)
             {
-                var rate = rateElement.GetDecimal();
-                return amount * rate;
+                return amount * exchangeData.Rates[targetCurrency.ToUpper()];
             }
         }
-        
+        catch
+        {
+        }
+
         return amount;
     }
+}
+
+public class ExchangeRateResponse
+{
+    public Dictionary<string, decimal>? Rates { get; set; }
 }
