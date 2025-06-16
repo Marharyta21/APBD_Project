@@ -56,35 +56,63 @@ public class RevenueService : IRevenueService
 
     public async Task<IndividualClient?> UpdateIndividualClient(int clientId, IndividualClient updatedClient)
     {
-        var existingClient = await _context.IndividualClients
-            .FirstOrDefaultAsync(c => c.Id == clientId && !c.IsDeleted);
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var existingClient = await _context.IndividualClients
+                .FirstOrDefaultAsync(c => c.Id == clientId && !c.IsDeleted);
 
-        if (existingClient == null) return null;
-        
-        existingClient.FirstName = updatedClient.FirstName;
-        existingClient.LastName = updatedClient.LastName;
-        existingClient.Address = updatedClient.Address;
-        existingClient.Email = updatedClient.Email;
-        existingClient.PhoneNumber = updatedClient.PhoneNumber;
+            if (existingClient == null) 
+            {
+                await transaction.RollbackAsync();
+                return null;
+            }
+            
+            existingClient.FirstName = updatedClient.FirstName;
+            existingClient.LastName = updatedClient.LastName;
+            existingClient.Address = updatedClient.Address;
+            existingClient.Email = updatedClient.Email;
+            existingClient.PhoneNumber = updatedClient.PhoneNumber;
 
-        await _context.SaveChangesAsync();
-        return existingClient;
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return existingClient;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            return null;
+        }
     }
 
     public async Task<CompanyClient?> UpdateCompanyClient(int clientId, CompanyClient updatedClient)
     {
-        var existingClient = await _context.CompanyClients
-            .FirstOrDefaultAsync(c => c.Id == clientId && !c.IsDeleted);
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var existingClient = await _context.CompanyClients
+                .FirstOrDefaultAsync(c => c.Id == clientId && !c.IsDeleted);
 
-        if (existingClient == null) return null;
+            if (existingClient == null) 
+            {
+                await transaction.RollbackAsync();
+                return null;
+            }
         
-        existingClient.CompanyName = updatedClient.CompanyName;
-        existingClient.Address = updatedClient.Address;
-        existingClient.Email = updatedClient.Email;
-        existingClient.PhoneNumber = updatedClient.PhoneNumber;
+            existingClient.CompanyName = updatedClient.CompanyName;
+            existingClient.Address = updatedClient.Address;
+            existingClient.Email = updatedClient.Email;
+            existingClient.PhoneNumber = updatedClient.PhoneNumber;
 
-        await _context.SaveChangesAsync();
-        return existingClient;
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return existingClient;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            return null;
+        }
     }
 
     public async Task<bool> SoftDeleteIndividualClient(int clientId)
