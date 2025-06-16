@@ -89,21 +89,35 @@ public class RevenueService : IRevenueService
 
     public async Task<bool> SoftDeleteIndividualClient(int clientId)
     {
-        var client = await _context.IndividualClients
-            .FirstOrDefaultAsync(c => c.Id == clientId && !c.IsDeleted);
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var client = await _context.IndividualClients
+                .FirstOrDefaultAsync(c => c.Id == clientId && !c.IsDeleted);
 
-        if (client == null) return false;
-        
-        client.IsDeleted = true;
-        client.FirstName = "DELETED";
-        client.LastName = "DELETED";
-        client.Email = "deleted@deleted.com";
-        client.PhoneNumber = "000000000";
-        client.Address = "DELETED";
-        client.PESEL = "00000000000";
+            if (client == null) 
+            {
+                await transaction.RollbackAsync();
+                return false;
+            }
+            
+            client.IsDeleted = true;
+            client.FirstName = "DELETED";
+            client.LastName = "DELETED";
+            client.Email = "deleted@deleted.com";
+            client.PhoneNumber = "000000000";
+            client.Address = "DELETED";
+            client.PESEL = "00000000000";
 
-        await _context.SaveChangesAsync();
-        return true;
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return true;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            return false;
+        }
     }
 
     public async Task<IEnumerable<Client>> GetAllClients()
@@ -168,50 +182,73 @@ public class RevenueService : IRevenueService
 
     public async Task<bool> ProcessContractPayment(int contractId, decimal amount)
     {
-        var contract = await GetContractById(contractId);
-        if (contract == null || !contract.IsPaymentWindowOpen || contract.IsFullyPaid)
-            return false;
-
-        var payment = new Payment
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        try
         {
-            ContractId = contractId,
-            Amount = amount,
-            PaymentDate = DateTime.UtcNow
-        };
+            var contract = await GetContractById(contractId);
+            if (contract == null || !contract.IsPaymentWindowOpen || contract.IsFullyPaid)
+            {
+                await transaction.RollbackAsync();
+                return false;
+            }
 
-        _context.Payments.Add(payment);
+            var payment = new Payment
+            {
+                ContractId = contractId,
+                Amount = amount,
+                PaymentDate = DateTime.UtcNow
+            };
+
+            _context.Payments.Add(payment);
         
-        if (contract.TotalPaid + amount >= contract.Price)
-        {
-            contract.IsSigned = true;
-        }
+            if (contract.TotalPaid + amount >= contract.Price)
+            {
+                contract.IsSigned = true;
+            }
 
-        await _context.SaveChangesAsync();
-        return true;
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return true;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            return false;
+        }
     }
 
     public async Task CancelExpiredContracts()
     {
-        var expiredContracts = await _context.Contracts
-            .Where(c => !c.IsSigned && !c.IsCancelled && DateTime.UtcNow > c.EndDate)
-            .ToListAsync();
-
-        foreach (var contract in expiredContracts)
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        try
         {
-            contract.IsCancelled = true;
-            
-            var payments = await _context.Payments
-                .Where(p => p.ContractId == contract.Id && !p.IsRefunded)
+            var expiredContracts = await _context.Contracts
+                .Where(c => !c.IsSigned && !c.IsCancelled && DateTime.UtcNow > c.EndDate)
                 .ToListAsync();
 
-            foreach (var payment in payments)
+            foreach (var contract in expiredContracts)
             {
-                payment.IsRefunded = true;
-                payment.RefundDate = DateTime.UtcNow;
-            }
-        }
+                contract.IsCancelled = true;
+            
+                var payments = await _context.Payments
+                    .Where(p => p.ContractId == contract.Id && !p.IsRefunded)
+                    .ToListAsync();
 
-        await _context.SaveChangesAsync();
+                foreach (var payment in payments)
+                {
+                    payment.IsRefunded = true;
+                    payment.RefundDate = DateTime.UtcNow;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
     
     // DISCOUNT SYSTEM
