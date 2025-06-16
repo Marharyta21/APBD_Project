@@ -216,8 +216,8 @@ public class RevenueService : IRevenueService
             return false;
         }
     }
-
-    public async Task CancelExpiredContracts()
+    
+    public async Task<int> CancelExpiredContracts()
     {
         using var transaction = await _context.Database.BeginTransactionAsync();
         try
@@ -243,6 +243,8 @@ public class RevenueService : IRevenueService
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
+        
+            return expiredContracts.Count;
         }
         catch
         {

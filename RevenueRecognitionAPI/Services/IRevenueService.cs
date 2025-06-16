@@ -24,7 +24,7 @@ public interface IRevenueService
     Task<bool> HasActiveContractForSoftware(int clientId, int softwareId);
     Task<IEnumerable<Contract>> GetClientContracts(int clientId);
     Task<bool> ProcessContractPayment(int contractId, decimal amount);
-    Task CancelExpiredContracts();
+    Task<int> CancelExpiredContracts();
 
     Task<IEnumerable<Discount>> GetActiveDiscounts();
     Task<decimal> CalculateDiscountedPrice(decimal originalPrice, int? softwareId, bool isReturningClient);
